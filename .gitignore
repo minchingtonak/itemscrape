@@ -1,5 +1,6 @@
 crawlee_storage/
-img/
+data/
+storage/
 
 # Logs
 logs

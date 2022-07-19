@@ -1,11 +1,16 @@
-import { createCheerioRouter, Dataset, RequestQueue } from 'crawlee';
-import { image } from 'image-downloader';
-import isURL from 'validator/lib/isURL.js';
+import { makeWikiCrawler, saveItemImage } from '../util.js';
 
-export const router = createCheerioRouter();
-export const queue = await RequestQueue.open();
+const GAME_ID = 'ds1';
 
-await queue.addRequest({ url: 'https://darksouls.wiki.fextralife.com/Items' });
+const info = await makeWikiCrawler({
+  gameId: GAME_ID,
+});
+
+const { crawler, router, dataset } = info;
+
+await crawler.addRequests([
+  { url: 'https://darksouls.wiki.fextralife.com/Items' },
+]);
 
 router.addDefaultHandler(async ({ enqueueLinks }) => {
   await enqueueLinks({
@@ -24,15 +29,6 @@ router.addHandler('CATEGORY', async ({ enqueueLinks, log, request }) => {
 });
 
 router.addHandler('ITEM', async ({ log, $, request }) => {
-  const sprite = $('div#infobox td img').attr('src');
-
-  const img = await image({
-    url: isURL(sprite!, { require_protocol: true })
-      ? sprite!
-      : `${request.url.split('/').slice(0, -1).join('')}${sprite}`,
-    dest: `${process.cwd()}/img/${request.url.split('/').slice(-1)[0]}.png`,
-  });
-
   const name = $('a#page-title').text().split('|')[0].trim();
   const descBody = $('div#infobox tbody p');
   const desc =
@@ -44,7 +40,17 @@ router.addHandler('ITEM', async ({ log, $, request }) => {
           .join(' ')
           .trim();
 
+  const sprite = $('div#infobox td img');
+  const img = await saveItemImage(GAME_ID, name, request, sprite);
+
   log.info('item', { name, desc, file: img.filename });
 
-  await Dataset.pushData({ url: request.url, name, desc });
+  await dataset.pushData({
+    url: request.url,
+    name,
+    flavor: desc,
+    sprite: `./img/${name}.png`,
+  });
 });
+
+export default info;
