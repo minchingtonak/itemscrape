@@ -10,19 +10,23 @@ if (!gameId) {
 }
 
 gameId.split(',').forEach(async (id) => {
-  const { crawler, dataset } = await importCrawler(id);
+  function _log(mes: string) {
+    log.info(`[${id}] ${mes}`);
+  }
+
+  const { crawler, dataset, sanitizer } = await importCrawler(id);
 
   await mkdir(`./data/${id}/img`, { recursive: true });
 
-  log.info(`Starting crawl '${id}'.`);
+  _log('Starting crawl.');
   await crawler.run();
-  log.info(`Crawl '${id}' finished.`);
+  _log('Crawl finished.');
 
-  // Collect data
-  const collectedItems = await dataset.getData();
-
-  await writeFile(
-    `./data/${id}/items.json`,
-    JSON.stringify(collectedItems.items, undefined, 2),
-  );
+  _log('Processing data');
+  const collectedItems = await dataset.getData(),
+    sanitized = collectedItems.items.map(sanitizer),
+    itemsPath = `./data/${id}/items.json`;
+  await writeFile(itemsPath, JSON.stringify(sanitized, undefined, 2));
+  _log('Data processed.');
+  _log(`Wrote ${itemsPath}`);
 });

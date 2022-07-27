@@ -1,4 +1,6 @@
-import { makeWikiCrawler, saveItemImage } from '../util.js';
+import { exit } from 'process';
+import { Item } from '../types.js';
+import { makeWikiCrawler, saveItemImage, trim } from '../util.js';
 
 const GAME_ID = 'ds2';
 
@@ -24,14 +26,23 @@ router.addDefaultHandler(async ({ enqueueLinks, crawler }) => {
     {
       url: 'https://darksouls2.wiki.fextralife.com/Illusory+Ring+of+the+Vengeful',
       label: 'ITEM',
+      userData: {
+        category: 'Unused Items',
+      },
     },
     {
       url: 'https://darksouls2.wiki.fextralife.com/Illusory+Ring+of+the+Guilty',
       label: 'ITEM',
+      userData: {
+        category: 'Unused Items',
+      },
     },
     {
       url: 'https://darksouls2.wiki.fextralife.com/Soul+of+Alsanna',
       label: 'ALSANNA',
+      userData: {
+        category: 'Boss Souls',
+      },
     },
   ]);
 });
@@ -42,8 +53,6 @@ router.addHandler('CATEGORY', async ({ enqueueLinks, log, request, $ }) => {
   }
 
   let nameColIdx = '2';
-  //   await writeFile(`./${request.url.split('/').slice(-1)[0]}.html`, $.html({ normalizeWhitespace: true }));
-
   $('table.wiki_table > tbody th').each((idx, elt) => {
     if (/name/i.test($(elt).text())) {
       nameColIdx = (idx + 1).toString();
@@ -52,15 +61,15 @@ router.addHandler('CATEGORY', async ({ enqueueLinks, log, request, $ }) => {
     return true;
   });
 
-  log.info('category', {
-    // idx: nameColIdx,
-    category: request.url.split('/').slice(-1)[0],
-    // text: $(`table.wiki_table > tbody tr > td:nth-child(${nameColIdx}) a`).text(),
-  });
+  const category = request.url.split('/').slice(-1)[0];
+  log.info('category', { category });
 
   await enqueueLinks({
     label: 'ITEM',
     selector: `table.wiki_table > tbody tr > td:nth-child(${nameColIdx}) a`,
+    userData: {
+      category,
+    },
   });
 });
 
@@ -104,6 +113,8 @@ router.addHandler('ITEM', async ({ log, request, $ }) => {
   await dataset.pushData({
     name,
     flavor: desc,
+    category: request.userData.category,
+    game: GAME_ID,
     sprite: `./img/${name}.png`,
     url: request.url,
   });
@@ -116,9 +127,7 @@ router.addHandler('ALSANNA', async ({ log, request, $ }) => {
     .map((_, e) => $(e).text())
     .get()
     .join(' ')
-    .trim()
-    .replaceAll(/\n/g, '')
-    .replaceAll(/ +/g, ' ');
+    .trim();
 
   const sprite = $('div#wiki-content-block > h1 + img');
   if (!sprite.length) {
@@ -131,9 +140,22 @@ router.addHandler('ALSANNA', async ({ log, request, $ }) => {
   await dataset.pushData({
     name,
     flavor: desc,
+    category: request.userData.category,
+    game: GAME_ID,
     sprite: `./img/${name}.png`,
     url: request.url,
   });
 });
 
-export default info;
+function sanitizer(item: Item): Item {
+  return {
+    ...item,
+    category: item.category.replaceAll('+', ' '),
+    flavor: trim(
+      item.flavor.replaceAll(/\n/g, '').replaceAll(/ +/g, ' '),
+      '"',
+    ).replaceAll(/([^\s]\.|,)([^\s])/g, '$1 $2'),
+  };
+}
+
+export default { ...info, sanitizer };

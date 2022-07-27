@@ -56,3 +56,17 @@ export async function saveItemImage(
     dest: `${process.cwd()}/data/${gameId}/img/${name}.png`,
   });
 }
+
+export function trim(s: string, chars: string) {
+  const [start, end] = [s.startsWith(chars), s.endsWith(chars)];
+
+  if (start && end) {
+    return s.slice(chars.length, -chars.length);
+  } else if (start && !end) {
+    return s.slice(chars.length);
+  } else if (!start && end) {
+    return s.slice(0, -chars.length);
+  }
+
+  return s;
+}

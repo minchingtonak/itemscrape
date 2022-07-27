@@ -1,4 +1,5 @@
-import { makeWikiCrawler, saveItemImage } from '../util.js';
+import { Item } from '../types.js';
+import { makeWikiCrawler, saveItemImage, trim } from '../util.js';
 
 const GAME_ID = 'ds1';
 
@@ -20,11 +21,15 @@ router.addDefaultHandler(async ({ enqueueLinks }) => {
 });
 
 router.addHandler('CATEGORY', async ({ enqueueLinks, log, request }) => {
-  log.info('category', { category: request.url.split('/').slice(-1)[0] });
+  const category = request.url.split('/').slice(-1)[0];
+  log.info('category', { category });
 
   await enqueueLinks({
     label: 'ITEM',
     selector: 'table.wiki_table tr > td:nth-child(1) > a.wiki_link',
+    userData: {
+      category,
+    },
   });
 });
 
@@ -48,9 +53,24 @@ router.addHandler('ITEM', async ({ log, $, request }) => {
   await dataset.pushData({
     url: request.url,
     name,
+    game: GAME_ID,
+    category: request.userData.category,
     flavor: desc,
     sprite: `./img/${name}.png`,
   });
 });
 
-export default info;
+function sanitizer(item: Item): Item {
+  if (item.name === 'Skull Lantern') {
+    item.flavor =
+      "Skull Lantern of the Catacombs necromancer. Drops from his long beard locks. This lantern alights the Tomb of the Giants, Nito's light-devouring domain of death. Also serves as a fire damage strike weapon.";
+  }
+
+  return {
+    ...item,
+    flavor: trim(item.flavor, '"').replaceAll(/([^\s]\.)([^\s])/g, '$1 $2'),
+    category: item.category.replaceAll('+', ' '),
+  };
+}
+
+export default { ...info, sanitizer };

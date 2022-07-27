@@ -1,4 +1,6 @@
-import { makeWikiCrawler, saveItemImage } from '../util.js';
+import { exit } from 'process';
+import { Item } from '../types.js';
+import { makeWikiCrawler, saveItemImage, trim } from '../util.js';
 
 const GAME_ID = 'ds3';
 
@@ -24,6 +26,9 @@ router.addDefaultHandler(async ({ enqueueLinks, crawler }) => {
     {
       url: "https://darksouls3.wiki.fextralife.com/Greirat's+Ashes",
       label: 'ITEM',
+      userData: {
+        category: 'Ashes',
+      },
     },
   ]);
 });
@@ -40,15 +45,15 @@ router.addHandler('CATEGORY', async ({ enqueueLinks, log, request, $ }) => {
     return true;
   });
 
-  log.info('category', {
-    // idx: nameColIdx,
-    category: request.url.split('/').slice(-1)[0],
-    // text: $(`table.wiki_table > tbody tr > td:nth-child(${nameColIdx}) a`).text(),
-  });
+  const category = request.url.split('/').slice(-1)[0];
+  log.info('category', { category });
 
   await enqueueLinks({
     label: 'ITEM',
     selector: `table.wiki_table > tbody tr > td:nth-child(${nameColIdx}) a`,
+    userData: {
+      category,
+    },
   });
 });
 
@@ -84,9 +89,24 @@ router.addHandler('ITEM', async ({ log, request, $ }) => {
   await dataset.pushData({
     name,
     flavor: desc,
+    category: request.userData.category,
+    game: GAME_ID,
     sprite: `./img/${name}.png`,
     url: request.url,
   });
 });
 
-export default info;
+function sanitizer(item: Item): Item {
+  return {
+    ...item,
+    category: item.category.replaceAll('+', ' '),
+    flavor: trim(
+      item.flavor
+        .replaceAll(/\u00a0/g, '')
+        .replaceAll(/([^\s]\.|,)([^\s])/g, '$1 $2'),
+      '"',
+    ),
+  };
+}
+
+export default { ...info, sanitizer };
